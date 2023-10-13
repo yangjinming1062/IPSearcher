@@ -1,3 +1,4 @@
+from sqlalchemy import Numeric
 from sqlalchemy.orm import Mapped
 
 from .base import *
@@ -10,8 +11,8 @@ class IPLocation(ModelBase):
     __tablename__ = 'ip_location'
     id: Mapped[str_id] = mapped_column(primary_key=True)
     version: Mapped[int] = mapped_column(index=True, comment='IP版本，4或者6')
-    start: Mapped[int] = mapped_column(index=True)
-    end: Mapped[int] = mapped_column(index=True)
+    start: Mapped[int] = mapped_column(Numeric, index=True)
+    end: Mapped[int] = mapped_column(Numeric, index=True)
     country_code: Mapped[str_small]
     country: Mapped[str_medium]
     region: Mapped[str_medium]

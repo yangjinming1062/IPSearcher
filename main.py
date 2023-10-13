@@ -5,7 +5,7 @@ from utils import *
 
 
 def load_data():
-    batch_size = 10000
+    batch_size = 100000
     with DatabaseManager() as db:
         batch_list = []
         files = {
