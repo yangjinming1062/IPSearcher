@@ -1,10 +1,3 @@
-pydantic==2.3.0
-## .env
-pydantic-settings==2.0.3
-python-dotenv==1.0.0
-# DB
-alembic==1.12.0
-SQLAlchemy==2.0.20
-psycopg[binary]==3.1.10
-# Other
 loguru==0.7.2
+requests
+tqdm

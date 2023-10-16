@@ -1,1 +1,0 @@
-数据文件过大，请通过https://lite.ip2location.com/database-download下载csv数据后放到当前目录进行数据加载
