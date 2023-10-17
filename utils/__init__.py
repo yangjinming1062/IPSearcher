@@ -10,9 +10,7 @@ import sys
 from loguru import logger
 
 from .classes import IP
-from .classes import IPSource
 from .classes import Singleton
-from .loader import load_data
 from .searcher import IPSearcher
 
 # 日志记录
