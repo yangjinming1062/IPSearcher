@@ -8,16 +8,10 @@ from constants import Constants
 from .classes import IP
 from .classes import Singleton
 
-_COUNTRY_INDEX = 1
-_REGION_INDEX = 2
-_CITY_INDEX = 3
-_LATITUDE_INDEX = 4
-_LONGITUDE_INDEX = 5
-
 
 class IPSearcher(metaclass=Singleton):
     """
-    IP2Location database
+    IP数据检索
     """
 
     def __init__(self):
@@ -87,12 +81,13 @@ class IPSearcher(metaclass=Singleton):
         def calc_off(position, mid):
             return base_addr + mid * (self._db_column * 4 + off) + off + 4 * position
 
-        raw_positions_row = self.db[
-                            (calc_off(_COUNTRY_INDEX, mid)) - 1: (calc_off(_COUNTRY_INDEX, mid)) - 1 + column_width]
+        raw_start = (calc_off(Constants.INDEX_COUNTRY, mid)) - 1
+        raw = self.db[raw_start: raw_start + column_width]
 
         # 国家信息
-        country_code = self._read_str(struct.unpack('<I', raw_positions_row[0: (_COUNTRY_INDEX * 4)])[0] + 1)
-        country = self._read_str(struct.unpack('<I', raw_positions_row[0: (_COUNTRY_INDEX * 4)])[0] + 4)
+        country_end = (Constants.INDEX_COUNTRY * 4)
+        country_code = self._read_str(struct.unpack('<I', raw[0: country_end])[0] + 1)
+        country = self._read_str(struct.unpack('<I', raw[0: country_end])[0] + 4)
         if country_code in ('CN', 'HK', 'MO', 'TW'):
             info.country_code = 'CN'
             info.country = '中国'
@@ -100,14 +95,15 @@ class IPSearcher(metaclass=Singleton):
             info.country_code = country_code
             info.country = self.translate_country.get(country, country)
         # 区域信息
-        region = self._read_str(
-            struct.unpack('<I', raw_positions_row[(_REGION_INDEX * 4 - 4): (_REGION_INDEX * 4)])[0] + 1)
+        region_end = (Constants.INDEX_REGION * 4)
+        region = self._read_str(struct.unpack('<I', raw[region_end - 4: region_end])[0] + 1)
         if country_code == 'TW':
             info.region = '台湾'
         else:
             info.region = self.translate_region.get(region, region)
         # 城市信息
-        city = self._read_str(struct.unpack('<I', raw_positions_row[(_CITY_INDEX * 4 - 4): (_CITY_INDEX * 4)])[0] + 1)
+        city_end = (Constants.INDEX_CITY * 4)
+        city = self._read_str(struct.unpack('<I', raw[city_end - 4: city_end])[0] + 1)
         if country_code == 'HK':
             # 香港数据精细到了街道，这里直接统一香港
             info.city = '香港'
@@ -115,11 +111,11 @@ class IPSearcher(metaclass=Singleton):
             info.city = self.translate_city.get(city, city)
         # 经纬度信息
         if self._db_type >= 5:
-            latitude = round(
-                struct.unpack('<f', raw_positions_row[(_LATITUDE_INDEX * 4 - 4): (_LATITUDE_INDEX * 4)])[0], 6)
+            latitude_end = (Constants.INDEX_LATITUDE * 4)
+            latitude = round(struct.unpack('<f', raw[latitude_end - 4: latitude_end])[0], 6)
             info.latitude = float(format(latitude, '.6f'))
-            longitude = round(
-                struct.unpack('<f', raw_positions_row[(_LONGITUDE_INDEX * 4 - 4): (_LONGITUDE_INDEX * 4)])[0], 6)
+            longitude_end = (Constants.INDEX_LONGITUDE * 4)
+            longitude = round(struct.unpack('<f', raw[longitude_end - 4: longitude_end])[0], 6)
             info.longitude = float(format(longitude, '.6f'))
         return info
 
