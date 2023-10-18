@@ -1,8 +1,9 @@
 import ipaddress
 import json
 import os
-import struct
 from mmap import mmap
+from struct import unpack
+from zipfile import ZipFile
 
 from constants import Constants
 from .classes import IP
@@ -16,19 +17,26 @@ class IPSearcher(metaclass=Singleton):
 
     def __init__(self):
         if not os.path.isfile(Constants.PATH_DB):
-            raise ValueError('数据库文件似乎不存在。')
+            zip_path = f'{Constants.PATH_DB}.zip'
+            if not os.path.exists(zip_path):
+                raise ValueError('数据库文件似乎不存在。')
+            else:
+                with ZipFile(zip_path, 'r') as zip_ref:
+                    name = os.path.basename(Constants.PATH_DB)
+                    target = os.path.dirname(Constants.PATH_DB)
+                    zip_ref.extract(name, target)
         with open(Constants.PATH_DB, 'r+b') as db:
             self.db = mmap(db.fileno(), 0)
         # 加载BIN文件头信息
         header_row = self.db[0:32]
-        self._db_type = struct.unpack('B', header_row[0:1])[0]
-        self._db_column = struct.unpack('B', header_row[1:2])[0]
-        self._v4_count = struct.unpack('<I', header_row[5:9])[0]
-        self._v4_addr = struct.unpack('<I', header_row[9:13])[0]
-        self._v6_count = struct.unpack('<I', header_row[13:17])[0]
-        self._v6_addr = struct.unpack('<I', header_row[17:21])[0]
-        self._v4_base_addr = struct.unpack('<I', header_row[21:25])[0]
-        self._v6_base_addr = struct.unpack('<I', header_row[25:29])[0]
+        self._db_type = unpack('B', header_row[0:1])[0]
+        self._db_column = unpack('B', header_row[1:2])[0]
+        self._v4_count = unpack('<I', header_row[5:9])[0]
+        self._v4_addr = unpack('<I', header_row[9:13])[0]
+        self._v6_count = unpack('<I', header_row[13:17])[0]
+        self._v6_addr = unpack('<I', header_row[17:21])[0]
+        self._v4_base_addr = unpack('<I', header_row[21:25])[0]
+        self._v6_base_addr = unpack('<I', header_row[25:29])[0]
 
         # 加载国家翻译记录
         if os.path.exists(Constants.PATH_COUNTRY):
@@ -57,13 +65,13 @@ class IPSearcher(metaclass=Singleton):
     def _read_str(self, offset):
         self.db.seek(offset - 1)
         data = self.db.read(257)
-        char_count = struct.unpack('B', data[0:1])[0]
+        char_count = unpack('B', data[0:1])[0]
         string = data[1:char_count + 1]
         return string.decode('iso-8859-1')
 
     def _read_int(self, offset):
         self.db.seek(offset - 1)
-        return struct.unpack('<L', self.db.read(4))[0]
+        return unpack('<L', self.db.read(4))[0]
 
     def _read_info(self, ip, mid, ip_version):
         info = IP()
@@ -86,8 +94,8 @@ class IPSearcher(metaclass=Singleton):
 
         # 国家信息
         country_end = (Constants.INDEX_COUNTRY * 4)
-        country_code = self._read_str(struct.unpack('<I', raw[0: country_end])[0] + 1)
-        country = self._read_str(struct.unpack('<I', raw[0: country_end])[0] + 4)
+        country_code = self._read_str(unpack('<I', raw[0: country_end])[0] + 1)
+        country = self._read_str(unpack('<I', raw[0: country_end])[0] + 4)
         if country_code in ('CN', 'HK', 'MO', 'TW'):
             info.country_code = 'CN'
             info.country = '中国'
@@ -96,14 +104,14 @@ class IPSearcher(metaclass=Singleton):
             info.country = self.translate_country.get(country, country)
         # 区域信息
         region_end = (Constants.INDEX_REGION * 4)
-        region = self._read_str(struct.unpack('<I', raw[region_end - 4: region_end])[0] + 1)
+        region = self._read_str(unpack('<I', raw[region_end - 4: region_end])[0] + 1)
         if country_code == 'TW':
             info.region = '台湾'
         else:
             info.region = self.translate_region.get(region, region)
         # 城市信息
         city_end = (Constants.INDEX_CITY * 4)
-        city = self._read_str(struct.unpack('<I', raw[city_end - 4: city_end])[0] + 1)
+        city = self._read_str(unpack('<I', raw[city_end - 4: city_end])[0] + 1)
         if country_code == 'HK':
             # 香港数据精细到了街道，这里直接统一香港
             info.city = '香港'
@@ -112,36 +120,36 @@ class IPSearcher(metaclass=Singleton):
         # 经纬度信息
         if self._db_type >= 5:
             latitude_end = (Constants.INDEX_LATITUDE * 4)
-            latitude = round(struct.unpack('<f', raw[latitude_end - 4: latitude_end])[0], 6)
+            latitude = round(unpack('<f', raw[latitude_end - 4: latitude_end])[0], 6)
             info.latitude = float(format(latitude, '.6f'))
             longitude_end = (Constants.INDEX_LONGITUDE * 4)
-            longitude = round(struct.unpack('<f', raw[longitude_end - 4: longitude_end])[0], 6)
+            longitude = round(unpack('<f', raw[longitude_end - 4: longitude_end])[0], 6)
             info.longitude = float(format(longitude, '.6f'))
         return info
 
     def _read_32x2(self, offset):
         self.db.seek(offset - 1)
         data = self.db.read(8)
-        return struct.unpack('<L', data[0:4])[0], struct.unpack('<L', data[4:8])[0]
+        return unpack('<L', data[0:4])[0], unpack('<L', data[4:8])[0]
 
     def _read_row32(self, offset):
         data_length = self._db_column * 4 + 4
         self.db.seek(offset - 1)
         raw_data = self.db.read(data_length)
-        ip_start = struct.unpack('<L', raw_data[0:4])[0]
-        ip_end = struct.unpack('<L', raw_data[data_length - 4:data_length])[0]
+        ip_start = unpack('<L', raw_data[0:4])[0]
+        ip_end = unpack('<L', raw_data[data_length - 4:data_length])[0]
         return ip_start, ip_end
 
     def _read_row128(self, offset):
         data_length = self._db_column * 4 + 12 + 16
         self.db.seek(offset - 1)
         raw_data = self.db.read(data_length)
-        return ((struct.unpack('<L', raw_data[12:16])[0] << 96) | (struct.unpack('<L', raw_data[8:12])[0] << 64) | (
-                struct.unpack('<L', raw_data[4:8])[0] << 32) | struct.unpack('<L', raw_data[0:4])[0],
-                (struct.unpack('<L', raw_data[data_length - 4:data_length])[0] << 96) | (
-                        struct.unpack('<L', raw_data[data_length - 8:data_length - 4])[0] << 64) | (
-                        struct.unpack('<L', raw_data[data_length - 12:data_length - 8])[0] << 32) |
-                struct.unpack('<L', raw_data[data_length - 16:data_length - 12])[0])
+        return ((unpack('<L', raw_data[12:16])[0] << 96) | (unpack('<L', raw_data[8:12])[0] << 64) | (
+                unpack('<L', raw_data[4:8])[0] << 32) | unpack('<L', raw_data[0:4])[0],
+                (unpack('<L', raw_data[data_length - 4:data_length])[0] << 96) | (
+                        unpack('<L', raw_data[data_length - 8:data_length - 4])[0] << 64) | (
+                        unpack('<L', raw_data[data_length - 12:data_length - 8])[0] << 32) |
+                unpack('<L', raw_data[data_length - 16:data_length - 12])[0])
 
     def search(self, address):
         """
